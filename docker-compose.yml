@@ -1,0 +1,74 @@
+version: "3"
+
+services:
+  djangoapp:
+    build: .
+    networks:
+      nginx_network:
+        aliases:
+          - djangoapp
+        ipv4_address: 10.10.10.10
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - 80:80
+    volumes:
+      - ./config/nginx/conf.d:/etc/nginx/conf.d
+      - /var/log/docker/nginx/:/var/log/nginx/
+    depends_on:
+      - djangoapp
+    networks:
+      nginx_network:
+        aliases:
+          - nginx
+        ipv4_address: 10.10.10.20
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - grafana-storage:/var/lib/grafana
+    networks:
+      nginx_network:
+        aliases:
+          - grafana
+        ipv4_address: 10.10.10.30
+
+  prometheus:
+    image: prom/prometheus
+    #ports:
+    #  - 9090
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      nginx_network:
+        aliases:
+          - prometheus
+        ipv4_address: 10.10.10.40
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:0.4.2
+    #ports:
+    #  - 9113
+    command:
+      - -nginx.scrape-uri
+      - http://10.10.10.20:8080/stub_status
+    depends_on:
+      - prometheus
+    networks:
+      nginx_network:
+        aliases:
+          - nginxexporter
+        ipv4_address: 10.10.10.50
+
+networks:
+  nginx_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.10.0/24
+volumes:
+  grafana-storage:
